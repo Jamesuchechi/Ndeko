@@ -1,0 +1,14 @@
+{
+  "name": "@ndeko/schemas",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Zod schemas and versioned event upcasters.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  }
+}

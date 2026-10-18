@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+.turbo/
+
+# Secrets: commit .env.example only
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log

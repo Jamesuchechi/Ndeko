@@ -1,0 +1,14 @@
+{
+  "name": "@ndeko/store",
+  "version": "0.0.0",
+  "private": true,
+  "description": "EventStore interface and adapters (memory, dexie, sqlite-wasm).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  }
+}
