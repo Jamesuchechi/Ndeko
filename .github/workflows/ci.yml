@@ -24,3 +24,5 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+        env:
+          SIM_SEEDS: '2000'

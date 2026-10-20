@@ -1,5 +1,4 @@
-import { describe, it } from 'vitest';
+import { MemoryEventStore } from './memory';
+import { runEventStoreContract } from './contract';
 
-describe('EventStore contract', () => {
-  it.todo('shared contract tests run against memory and dexie adapters (Phase 1)');
-});
+runEventStoreContract('memory', () => new MemoryEventStore());

@@ -8,7 +8,7 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 - [x] TypeScript strict, shared `tsconfig.base.json`
 - [x] ESLint + Prettier + `pnpm typecheck`
 - [x] Vitest wired for all packages
-- [ ] CI: lint, typecheck, test on every push
+- [x] CI: format, lint, typecheck, test on every push
 - [x] `.env.example` committed, `.env` gitignored, single lockfile (`pnpm-lock.yaml`)
 - [x] Decide product name: Ndekọ
 
@@ -18,12 +18,12 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 
 **Domain and storage**
 
-- [ ] Event envelope type (done in core) + zod schemas with `schemaV`
+- [x] Event envelope type (done in core) + zod schemas with `schemaV`
 - [x] UUIDv7 generation
 - [x] HLC implementation with unit tests (local tick, remote merge, drift guard)
-- [ ] `EventStore` interface + `memory` adapter
+- [x] `EventStore` interface + `memory` adapter + shared contract tests
 - [ ] `dexie` adapter passing the shared `EventStore` contract tests
-- [ ] Projection engine (pure fold) with snapshots
+- [x] Projection engine (pure fold) with snapshots; stock and products projections
 - [x] Money (integer kobo) and quantity (milli-unit) helpers, single rounding rule
 
 **Products and stock**
@@ -71,10 +71,10 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 
 **Verification**
 
-- [ ] `packages/sim`: N devices, seeded RNG, random offline periods, reordering and duplication
-- [ ] Convergence assertion: identical projections on all devices
+- [x] `packages/sim`: N devices, seeded RNG, random offline periods, reordering and duplication
+- [x] Convergence assertion: identical projections on all devices
 - [ ] Run 1,000+ seeds in CI; commit failing seeds as fixtures
-- [ ] Two-tills-last-unit scenario raises a reconciliation flag
+- [x] Two-tills-last-unit scenario raises a reconciliation flag
 
 **Done when:** the simulator passes thousands of seeds and two real phones converge after one has been offline for a day.
 

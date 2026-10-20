@@ -206,10 +206,14 @@ Run it across thousands of seeds in CI. Any failing seed is committed as a regre
 
 ## 16. Decision log
 
-| Date       | Decision                                           | Reason                                                     |
-| ---------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| 2026-10-18 | Event-sourced, local-first model                   | Eliminates lost-update bugs; offline is the default case   |
-| 2026-10-18 | Dexie first, SQLite-WASM behind the same interface | Ship sooner; keep the option for real SQL                  |
-| 2026-10-18 | Integer kobo and milli-units                       | No float errors in money or weighed goods                  |
-| 2026-10-18 | Product named Ndekọ (Igbo: record, register)       | The name describes the event log at the core of the design |
-| 2026-10-18 | `server_seq` for cursors, `hlc` for logical order  | Keeps paging simple and ordering correct                   |
+| Date       | Decision                                           | Reason                                                                            |
+| ---------- | -------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 2026-10-18 | Event-sourced, local-first model                   | Eliminates lost-update bugs; offline is the default case                          |
+| 2026-10-18 | Dexie first, SQLite-WASM behind the same interface | Ship sooner; keep the option for real SQL                                         |
+| 2026-10-18 | Integer kobo and milli-units                       | No float errors in money or weighed goods                                         |
+| 2026-10-18 | Product named Ndekọ (Igbo: record, register)       | The name describes the event log at the core of the design                        |
+| 2026-10-18 | `server_seq` for cursors, `hlc` for logical order  | Keeps paging simple and ordering correct                                          |
+| 2026-10-20 | Local projection cursor is arrival order, not HLC  | A late remote event with an old HLC would be skipped by an HLC snapshot watermark |
+| 2026-10-20 | `EventStore` is a pure log; no `project()` method  | Projections are folds in `@ndeko/core`; keeps adapters thin                       |
+| 2026-10-20 | Concrete projections live in `@ndeko/projections`  | They need payload types from schemas, which depend on core                        |
+| 2026-10-20 | Reconciliation flags are derived from state        | Stored flags would be order-dependent; derived ones self-clear                    |

@@ -58,8 +58,9 @@ ndeko/
 │   ├── web/            # PWA: POS, inventory, reports
 │   └── api/            # Sync server (push/pull, auth, device registry)
 ├── packages/
-│   ├── core/           # Events, HLC, projections. Pure TS, no I/O
+│   ├── core/           # Events, HLC, projection engine. Pure TS, no I/O
 │   ├── schemas/        # Zod schemas + versioned event upcasters
+│   ├── projections/    # Stock and products projections
 │   ├── store/          # EventStore adapters: memory, dexie, sqlite-wasm
 │   └── sim/            # Convergence simulator (N devices, random offline)
 ├── ARCHITECTURE.md

@@ -10,5 +10,11 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ndeko/core": "workspace:^",
+    "@ndeko/projections": "workspace:^",
+    "@ndeko/schemas": "workspace:^",
+    "@ndeko/store": "workspace:^"
   }
 }
