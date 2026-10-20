@@ -8,15 +8,24 @@ import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { ReceiptModal } from '../components/ReceiptModal';
 
 export const PosView: React.FC = () => {
-  const { products, stockState, config, recordSale } = useNdeko();
+  const { products, stockState, config, recordSale, customers, createOrUpdateCustomer } =
+    useNdeko();
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [tenderMethod, setTenderMethod] = useState<'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT'>('CASH');
-  const [customerName, setCustomerName] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [isQuickCustOpen, setIsQuickCustOpen] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickPhone, setQuickPhone] = useState('');
+  const [quickLimitNaira, setQuickLimitNaira] = useState('50000');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<NdekoEvent<SaleRecordedV1> | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const selectedCustomer = useMemo(() => {
+    return customers.find((c) => c.id === selectedCustomerId);
+  }, [customers, selectedCustomerId]);
 
   // Active products
   const activeProducts = useMemo(() => {
@@ -107,8 +116,8 @@ export const PosView: React.FC = () => {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    if (tenderMethod === 'CREDIT' && !customerName.trim()) {
-      setErrorMsg('Customer name/phone is required for credit sales.');
+    if (tenderMethod === 'CREDIT' && !selectedCustomerId) {
+      setErrorMsg('Please select a registered customer for credit sales.');
       return;
     }
     setErrorMsg(null);
@@ -133,12 +142,12 @@ export const PosView: React.FC = () => {
         lines,
         tenders,
         totalKobo: cartTotalKobo,
-        customerId: tenderMethod === 'CREDIT' ? customerName.trim() : undefined,
+        customerId: tenderMethod === 'CREDIT' ? selectedCustomerId : undefined,
       });
 
       setCompletedSale(saleEvent);
       clearCart();
-      setCustomerName('');
+      setSelectedCustomerId('');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error recording sale';
       setErrorMsg(msg);
@@ -368,16 +377,86 @@ export const PosView: React.FC = () => {
           {/* Customer Input if Credit */}
           {tenderMethod === 'CREDIT' && (
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>
-                Customer Name / Phone (Required for Credit)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Alh. Bello / 08031234567"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <label style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>
+                  Credit Customer *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCustOpen(true)}
+                  style={{
+                    background: 'transparent',
+                    color: 'var(--accent-cyan)',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  + Quick Add
+                </button>
+              </div>
+
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
                 style={customerInputStyle}
-              />
+              >
+                <option value="">-- Select Credit Customer --</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} (Balance: {formatNaira(c.balanceKobo)} | Available:{' '}
+                    {formatNaira(c.availableCreditKobo)})
+                  </option>
+                ))}
+              </select>
+
+              {selectedCustomer && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}
+                  >
+                    <span style={{ color: 'var(--text-muted)' }}>Credit Limit:</span>
+                    <strong>{formatNaira(selectedCustomer.creditLimitKobo)}</strong>
+                  </div>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}
+                  >
+                    <span style={{ color: 'var(--text-muted)' }}>Current Balance:</span>
+                    <strong
+                      style={{ color: selectedCustomer.balanceKobo > 0 ? '#f43f5e' : 'inherit' }}
+                    >
+                      {formatNaira(selectedCustomer.balanceKobo)}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Available Credit:</span>
+                    <strong style={{ color: 'var(--accent-cyan)' }}>
+                      {formatNaira(selectedCustomer.availableCreditKobo)}
+                    </strong>
+                  </div>
+                  {selectedCustomer.creditLimitKobo > 0 &&
+                    cartTotalKobo > selectedCustomer.availableCreditKobo && (
+                      <div style={{ marginTop: 6, color: '#f43f5e', fontWeight: 700 }}>
+                        ⚠️ Warning: Sale exceeds available credit limit!
+                      </div>
+                    )}
+                </div>
+              )}
             </div>
           )}
 
@@ -410,6 +489,132 @@ export const PosView: React.FC = () => {
 
       {/* Printable Receipt Dialog */}
       <ReceiptModal saleEvent={completedSale} onClose={() => setCompletedSale(null)} />
+
+      {/* Quick Add Customer Dialog */}
+      {isQuickCustOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              padding: 24,
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-md)',
+            }}
+            className="glass-panel"
+          >
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: 14 }}>
+              Quick Register Customer
+            </h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: 4,
+                }}
+              >
+                Customer Name *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Alh. Bello"
+                value={quickName}
+                onChange={(e) => setQuickName(e.target.value)}
+                style={customerInputStyle}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: 4,
+                }}
+              >
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                placeholder="e.g. 08031234567"
+                value={quickPhone}
+                onChange={(e) => setQuickPhone(e.target.value)}
+                style={customerInputStyle}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: 4,
+                }}
+              >
+                Credit Limit (₦ Naira)
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 50000"
+                value={quickLimitNaira}
+                onChange={(e) => setQuickLimitNaira(e.target.value)}
+                style={customerInputStyle}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setIsQuickCustOpen(false)}
+                className="btn-secondary"
+                style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!quickName.trim()) return;
+                  const limitKobo = Math.round(parseFloat(quickLimitNaira || '0') * 100);
+                  const newId = await createOrUpdateCustomer({
+                    name: quickName.trim(),
+                    phone: quickPhone.trim() || undefined,
+                    creditLimitKobo: limitKobo,
+                  });
+                  setSelectedCustomerId(newId);
+                  setIsQuickCustOpen(false);
+                  setQuickName('');
+                  setQuickPhone('');
+                }}
+                className="glow-btn"
+                style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)' }}
+              >
+                Create & Select
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

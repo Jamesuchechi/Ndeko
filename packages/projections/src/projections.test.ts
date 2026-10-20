@@ -2,6 +2,8 @@ import { formatHlc, foldEvents, uuidv7, type EventType, type NdekoEvent } from '
 import { describe, expect, it } from 'vitest';
 import { findByBarcode, productsProjection, productView } from './products';
 import { negativeStock, stockLevel, stockProjection } from './stock';
+import { customersProjection, customerView, customerStatement } from './customers';
+import { calculateExpectedCashForDate, exportToCsv } from './reports';
 
 let n = 0;
 function ev(
@@ -210,5 +212,152 @@ describe('products projection', () => {
 
   it('productView is undefined for unknown ids', () => {
     expect(productView(productsProjection.init(), 'nope')).toBeUndefined();
+  });
+});
+
+describe('customers projection', () => {
+  const upsertCustomer = (customerId: string, fields: Record<string, unknown>, wall: number) =>
+    ev('CUSTOMER_UPSERTED', { customerId, ...fields }, { wall });
+
+  const creditSale = (saleId: string, customerId: string, amountKobo: number, wall: number) =>
+    ev(
+      'SALE_RECORDED',
+      {
+        saleId,
+        receiptNo: `R-${saleId}`,
+        customerId,
+        lines: [
+          { productId: 'p1', qty: 1000, unitPriceKobo: amountKobo, lineTotalKobo: amountKobo },
+        ],
+        tenders: [{ method: 'CREDIT', amountKobo }],
+        totalKobo: amountKobo,
+      },
+      { wall },
+    );
+
+  const payment = (customerId: string, amountKobo: number, wall: number) =>
+    ev(
+      'PAYMENT_RECEIVED',
+      {
+        paymentId: uuidv7(),
+        customerId,
+        amountKobo,
+        method: 'CASH',
+      },
+      { wall },
+    );
+
+  it('tracks profile, credit limit and running balance on credit sale and payment', () => {
+    const s = foldEvents(customersProjection, [
+      upsertCustomer(
+        'c1',
+        { name: 'Alhaji Musa', phone: '08012345678', creditLimitKobo: 50000 },
+        1000,
+      ),
+      creditSale('s1', 'c1', 20000, 2000),
+      payment('c1', 5000, 3000),
+    ]);
+
+    const view = customerView(s, 'c1');
+    expect(view).toBeDefined();
+    expect(view?.name).toBe('Alhaji Musa');
+    expect(view?.phone).toBe('08012345678');
+    expect(view?.creditLimitKobo).toBe(50000);
+    expect(view?.balanceKobo).toBe(15000); // 20,000 - 5,000
+    expect(view?.availableCreditKobo).toBe(35000); // 50,000 - 15,000
+    expect(view?.isOverLimit).toBe(false);
+
+    const statement = customerStatement(s, 'c1');
+    expect(statement).toHaveLength(2);
+    expect(statement[0]?.type).toBe('CREDIT_SALE');
+    expect(statement[0]?.amountKobo).toBe(20000);
+    expect(statement[1]?.type).toBe('PAYMENT');
+    expect(statement[1]?.amountKobo).toBe(-5000);
+  });
+
+  it('handles credit sale voids in normal and held out-of-order sequence', () => {
+    // Normal: sale then void
+    const normal = foldEvents(customersProjection, [
+      upsertCustomer('c1', { name: 'Customer 1' }, 1000),
+      creditSale('s1', 'c1', 10000, 2000),
+      voidSale('s1', { wall: 3000 }),
+    ]);
+    expect(customerView(normal, 'c1')?.balanceKobo).toBe(0);
+
+    // Held void: void arrives before credit sale
+    const reversed = foldEvents(customersProjection, [
+      upsertCustomer('c1', { name: 'Customer 1' }, 1000),
+      voidSale('s1', { wall: 3000 }),
+      creditSale('s1', 'c1', 10000, 2000),
+    ]);
+    expect(customerView(reversed, 'c1')?.balanceKobo).toBe(0);
+  });
+
+  it('is commutative across shuffles', () => {
+    const events = [
+      upsertCustomer('c1', { name: 'Musa', creditLimitKobo: 100000 }, 1000),
+      creditSale('s1', 'c1', 30000, 2000),
+      payment('c1', 10000, 3000),
+      creditSale('s2', 'c1', 15000, 4000),
+      voidSale('s1', { wall: 5000 }),
+      payment('c1', 5000, 6000),
+    ];
+    const expected = foldEvents(customersProjection, events);
+
+    for (let seed = 1; seed <= 50; seed++) {
+      expect(foldEvents(customersProjection, shuffle(events, seed))).toEqual(expected);
+    }
+  });
+});
+
+describe('reporting and CSV export', () => {
+  it('calculates expected cash and daily sales summaries', () => {
+    const events = [
+      ev(
+        'SALE_RECORDED',
+        {
+          saleId: 's1',
+          receiptNo: 'R1',
+          lines: [{ productId: 'p1', qty: 2000, unitPriceKobo: 1000, lineTotalKobo: 2000 }],
+          tenders: [{ method: 'CASH', amountKobo: 2000 }],
+          totalKobo: 2000,
+        },
+        { wall: 1700000000000 },
+      ),
+      ev(
+        'PAYMENT_RECEIVED',
+        {
+          paymentId: 'pay1',
+          customerId: 'c1',
+          amountKobo: 500,
+          method: 'CASH',
+        },
+        { wall: 1700000000100 },
+      ),
+    ];
+
+    const todayStr = new Date(0).toISOString().slice(0, 10); // createdAt = 0 in mock ev
+    const cash = calculateExpectedCashForDate(events, todayStr);
+    expect(cash.expectedCashKobo).toBe(2500); // 2000 sale + 500 payment
+    expect(cash.cashSalesCount).toBe(1);
+  });
+
+  it('formats RFC-4180 compliant CSV strings with escaped quotes', () => {
+    const csv = exportToCsv(
+      [
+        { header: 'Product Name', key: 'name' },
+        { header: 'Price (NGN)', key: 'price', format: (v: number) => `₦${(v / 100).toFixed(2)}` },
+      ],
+      [
+        { name: 'Indomie 70g "Chicken"', price: 25000 },
+        { name: 'Peak Milk, 160g', price: 7500 },
+      ],
+    );
+
+    expect(csv).toBe(
+      '"Product Name","Price (NGN)"\n' +
+        '"Indomie 70g ""Chicken""","₦250.00"\n' +
+        '"Peak Milk, 160g","₦75.00"',
+    );
   });
 });

@@ -10,6 +10,7 @@ import {
   dayClosedV1,
   paymentReceivedV1,
   productUpsertedV1,
+  customerUpsertedV1,
   saleRecordedV1,
   saleVoidedV1,
   stockAdjustedV1,
@@ -19,6 +20,7 @@ import {
   type DayClosedV1,
   type PaymentReceivedV1,
   type ProductUpsertedV1,
+  type CustomerUpsertedV1,
   type SaleRecordedV1,
   type SaleVoidedV1,
   type StockAdjustedV1,
@@ -30,6 +32,7 @@ import {
 /** Latest payload type per event type. */
 export interface EventPayloads {
   PRODUCT_UPSERTED: ProductUpsertedV1;
+  CUSTOMER_UPSERTED: CustomerUpsertedV1;
   STOCK_RECEIVED: StockReceivedV1;
   STOCK_ADJUSTED: StockAdjustedV1;
   SALE_RECORDED: SaleRecordedV1;
@@ -48,6 +51,7 @@ export type TypedEvent<T extends EventType = EventType> = {
 /** Payload schema for every known (type, schemaV). Append new versions, never edit old ones. */
 const PAYLOAD_SCHEMAS: Record<EventType, Readonly<Record<number, z.ZodTypeAny>>> = {
   PRODUCT_UPSERTED: { 1: productUpsertedV1 },
+  CUSTOMER_UPSERTED: { 1: customerUpsertedV1 },
   STOCK_RECEIVED: { 1: stockReceivedV1 },
   STOCK_ADJUSTED: { 1: stockAdjustedV1 },
   SALE_RECORDED: { 1: saleRecordedV1 },
@@ -61,6 +65,7 @@ const PAYLOAD_SCHEMAS: Record<EventType, Readonly<Record<number, z.ZodTypeAny>>>
 /** Latest payload version per event type. Bump when a new schema version is added. */
 export const LATEST_SCHEMA_V: Readonly<Record<EventType, number>> = {
   PRODUCT_UPSERTED: 1,
+  CUSTOMER_UPSERTED: 1,
   STOCK_RECEIVED: 1,
   STOCK_ADJUSTED: 1,
   SALE_RECORDED: 1,

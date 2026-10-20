@@ -32,18 +32,21 @@ export const InventoryView: React.FC = () => {
     barcode: string;
     priceNaira: string;
     costNaira: string;
+    minStockQtyUnits: string;
     unit: NonNullable<ProductUpsertedV1['unit']>;
   }>({
     name: '',
     barcode: '',
     priceNaira: '',
     costNaira: '',
+    minStockQtyUnits: '5',
     unit: 'each',
   });
 
   const [receiveForm, setReceiveForm] = useState({
     qtyUnits: '',
     costNaira: '',
+    supplier: '',
     note: '',
   });
 
@@ -74,6 +77,7 @@ export const InventoryView: React.FC = () => {
       barcode: '',
       priceNaira: '',
       costNaira: '',
+      minStockQtyUnits: '5',
       unit: 'each',
     });
     setIsProductModalOpen(true);
@@ -86,6 +90,7 @@ export const InventoryView: React.FC = () => {
       barcode: p.barcode || '',
       priceNaira: p.priceKobo ? (p.priceKobo / 100).toString() : '',
       costNaira: p.costKobo ? (p.costKobo / 100).toString() : '',
+      minStockQtyUnits: p.minStockQty ? (p.minStockQty / 1000).toString() : '5',
       unit: (p.unit as NonNullable<ProductUpsertedV1['unit']>) || 'each',
     });
     setIsProductModalOpen(true);
@@ -97,6 +102,9 @@ export const InventoryView: React.FC = () => {
     const costKobo = prodForm.costNaira
       ? Math.round(parseFloat(prodForm.costNaira) * 100)
       : undefined;
+    const minStockQty = prodForm.minStockQtyUnits
+      ? Math.round(parseFloat(prodForm.minStockQtyUnits) * 1000)
+      : undefined;
 
     await createOrUpdateProduct({
       productId: selectedProduct?.productId,
@@ -104,6 +112,7 @@ export const InventoryView: React.FC = () => {
       barcode: prodForm.barcode || null,
       priceKobo,
       costKobo,
+      minStockQty,
       unit: prodForm.unit,
     });
     setIsProductModalOpen(false);
@@ -111,7 +120,12 @@ export const InventoryView: React.FC = () => {
 
   const handleOpenReceive = (p: ProductView) => {
     setSelectedProduct(p);
-    setReceiveForm({ qtyUnits: '', costNaira: '', note: '' });
+    setReceiveForm({
+      qtyUnits: '',
+      costNaira: p.costKobo ? (p.costKobo / 100).toString() : '',
+      supplier: '',
+      note: '',
+    });
     setIsReceiveModalOpen(true);
   };
 
@@ -128,8 +142,8 @@ export const InventoryView: React.FC = () => {
       selectedProduct.productId,
       qtyMilli,
       costKobo,
-      undefined,
-      receiveForm.note || undefined,
+      receiveForm.supplier.trim() || undefined,
+      receiveForm.note.trim() || undefined,
     );
     setIsReceiveModalOpen(false);
   };
@@ -241,6 +255,8 @@ export const InventoryView: React.FC = () => {
               const currentStockMilli = stockLevel(stockState, config.branchId, p.productId);
               const currentQty = currentStockMilli / 1000;
               const isNegative = currentStockMilli < 0;
+              const thresholdMilli = p.minStockQty ?? 5000;
+              const isLowStock = currentStockMilli <= thresholdMilli && currentStockMilli > 0;
 
               return (
                 <tr key={p.productId} style={tableRowStyle}>
@@ -271,11 +287,19 @@ export const InventoryView: React.FC = () => {
                         isNegative
                           ? 'badge-rose'
                           : currentQty === 0
-                            ? 'badge-amber'
-                            : 'badge-emerald'
+                            ? 'badge-rose'
+                            : isLowStock
+                              ? 'badge-amber'
+                              : 'badge-emerald'
                       }`}
                     >
-                      {isNegative ? 'Negative' : currentQty === 0 ? 'Out of stock' : 'In stock'}
+                      {isNegative
+                        ? 'Deficit'
+                        : currentQty === 0
+                          ? 'Out of stock'
+                          : isLowStock
+                            ? `Low (${currentQty})`
+                            : 'In stock'}
                     </span>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -405,6 +429,31 @@ export const InventoryView: React.FC = () => {
                   />
                 </div>
               </div>
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>
+                  Low-Stock Alert Threshold ({prodForm.unit || 'units'})
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  placeholder="e.g. 5"
+                  value={prodForm.minStockQtyUnits}
+                  onChange={(e) => setProdForm({ ...prodForm, minStockQtyUnits: e.target.value })}
+                  style={inputStyle}
+                  className="mono"
+                />
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-dim)',
+                    marginTop: 4,
+                    display: 'block',
+                  }}
+                >
+                  Alerts show in Reconciliation when stock drops to or below this level.
+                </span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button
                   type="button"
@@ -464,6 +513,16 @@ export const InventoryView: React.FC = () => {
                   onChange={(e) => setReceiveForm({ ...receiveForm, costNaira: e.target.value })}
                   style={inputStyle}
                   className="mono"
+                />
+              </div>
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Supplier / Vendor</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dangote Sugar Refinery / Garki Market"
+                  value={receiveForm.supplier}
+                  onChange={(e) => setReceiveForm({ ...receiveForm, supplier: e.target.value })}
+                  style={inputStyle}
                 />
               </div>
               <div style={formGroupStyle}>

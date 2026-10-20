@@ -18,6 +18,7 @@ export interface ProductRecord {
   barcode?: Lww<string | null>;
   priceKobo?: Lww<number>;
   costKobo?: Lww<number>;
+  minStockQty?: Lww<number>;
   unit?: Lww<NonNullable<ProductUpsertedV1['unit']>>;
   archived?: Lww<boolean>;
 }
@@ -26,7 +27,15 @@ export interface ProductsState {
   products: Record<string, ProductRecord>;
 }
 
-const FIELDS = ['name', 'barcode', 'priceKobo', 'costKobo', 'unit', 'archived'] as const;
+const FIELDS = [
+  'name',
+  'barcode',
+  'priceKobo',
+  'costKobo',
+  'minStockQty',
+  'unit',
+  'archived',
+] as const;
 
 function write<K extends (typeof FIELDS)[number]>(
   rec: ProductRecord,
@@ -62,6 +71,7 @@ export interface ProductView {
   readonly barcode: string | null | undefined;
   readonly priceKobo: number | undefined;
   readonly costKobo: number | undefined;
+  readonly minStockQty: number | undefined;
   readonly unit: ProductUpsertedV1['unit'];
   readonly archived: boolean;
 }
@@ -75,6 +85,7 @@ export function productView(state: ProductsState, productId: string): ProductVie
     barcode: r.barcode?.v,
     priceKobo: r.priceKobo?.v,
     costKobo: r.costKobo?.v,
+    minStockQty: r.minStockQty?.v,
     unit: r.unit?.v,
     archived: r.archived?.v ?? false,
   };

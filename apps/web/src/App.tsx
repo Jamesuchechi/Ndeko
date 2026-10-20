@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { useNdeko } from './context/NdekoContext';
 import { PosView } from './views/PosView';
 import { InventoryView } from './views/InventoryView';
+import { CustomersView } from './views/CustomersView';
+import { ReconciliationView } from './views/ReconciliationView';
+import { ReportsView } from './views/ReportsView';
 import { SalesHistoryView } from './views/SalesHistoryView';
 import { SettingsView } from './views/SettingsView';
 import { PinLockScreen } from './components/PinLockScreen';
 
-type Tab = 'pos' | 'inventory' | 'sales' | 'settings';
+type Tab = 'pos' | 'inventory' | 'customers' | 'reconciliation' | 'reports' | 'sales' | 'settings';
 
 export const App: React.FC = () => {
   const {
@@ -14,6 +17,7 @@ export const App: React.FC = () => {
     isLocked,
     config,
     pendingCount,
+    negativeStockAlerts,
     isOnline,
     lockTill,
     syncState,
@@ -59,19 +63,52 @@ export const App: React.FC = () => {
             onClick={() => setActiveTab('pos')}
             style={{ ...tabBtnStyle, ...(activeTab === 'pos' ? activeTabStyle : {}) }}
           >
-            🛒 POS Register
+            🛒 POS
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
             style={{ ...tabBtnStyle, ...(activeTab === 'inventory' ? activeTabStyle : {}) }}
           >
-            📦 Inventory & Stock
+            📦 Inventory
+          </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            style={{ ...tabBtnStyle, ...(activeTab === 'customers' ? activeTabStyle : {}) }}
+          >
+            🤝 Customers
+          </button>
+          <button
+            onClick={() => setActiveTab('reconciliation')}
+            style={{ ...tabBtnStyle, ...(activeTab === 'reconciliation' ? activeTabStyle : {}) }}
+          >
+            ⚖️ Reconciliation
+            {negativeStockAlerts.length > 0 && (
+              <span
+                style={{
+                  marginLeft: 6,
+                  padding: '1px 6px',
+                  borderRadius: 999,
+                  background: 'var(--accent-rose)',
+                  color: '#ffffff',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                }}
+              >
+                {negativeStockAlerts.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            style={{ ...tabBtnStyle, ...(activeTab === 'reports' ? activeTabStyle : {}) }}
+          >
+            📊 Reports
           </button>
           <button
             onClick={() => setActiveTab('sales')}
             style={{ ...tabBtnStyle, ...(activeTab === 'sales' ? activeTabStyle : {}) }}
           >
-            📜 Sales & Cash-Up
+            📜 History
           </button>
           <button
             onClick={() => setActiveTab('settings')}
@@ -170,6 +207,9 @@ export const App: React.FC = () => {
       <main style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'pos' && <PosView />}
         {activeTab === 'inventory' && <InventoryView />}
+        {activeTab === 'customers' && <CustomersView />}
+        {activeTab === 'reconciliation' && <ReconciliationView />}
+        {activeTab === 'reports' && <ReportsView />}
         {activeTab === 'sales' && <SalesHistoryView />}
         {activeTab === 'settings' && <SettingsView />}
       </main>

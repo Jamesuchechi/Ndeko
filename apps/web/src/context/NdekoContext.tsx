@@ -4,11 +4,18 @@ import { DexieEventStore } from '@ndeko/store';
 import {
   stockProjection,
   productsProjection,
+  customersProjection,
   productView,
+  customerView,
+  customerStatement,
   negativeStock,
+  stockLevel,
   type StockState,
   type ProductsState,
+  type CustomersState,
   type ProductView,
+  type CustomerView,
+  type CustomerTransaction,
   type NegativeStock,
 } from '@ndeko/projections';
 import { LATEST_SCHEMA_V, type ProductUpsertedV1, type SaleRecordedV1 } from '@ndeko/schemas';
@@ -43,14 +50,23 @@ export interface CartLine {
   lineTotalKobo: number;
 }
 
+export interface LowStockAlert {
+  product: ProductView;
+  currentStockMilli: number;
+  thresholdMilli: number;
+}
+
 export interface NdekoContextType {
   isReady: boolean;
   isLocked: boolean;
   config: DeviceConfig;
   stockState: StockState;
   productsState: ProductsState;
+  customersState: CustomersState;
   products: ProductView[];
+  customers: CustomerView[];
   negativeStockAlerts: NegativeStock[];
+  lowStockAlerts: LowStockAlert[];
   pendingCount: number;
   totalEventCount: number;
   isOnline: boolean;
@@ -68,9 +84,24 @@ export interface NdekoContextType {
     barcode?: string | null | undefined;
     priceKobo: number;
     costKobo?: number | undefined;
+    minStockQty?: number | undefined;
     unit?: ProductUpsertedV1['unit'] | undefined;
     archived?: boolean | undefined;
   }) => Promise<string>;
+  createOrUpdateCustomer: (fields: {
+    customerId?: string | undefined;
+    name: string;
+    phone?: string | undefined;
+    creditLimitKobo?: number | undefined;
+    archived?: boolean | undefined;
+  }) => Promise<string>;
+  recordPayment: (
+    customerId: string,
+    amountKobo: number,
+    method: 'CASH' | 'TRANSFER' | 'CARD',
+    note?: string | undefined,
+  ) => Promise<string>;
+  getCustomerStatement: (customerId: string) => CustomerTransaction[];
   receiveStock: (
     productId: string,
     qty: number,
@@ -101,6 +132,7 @@ export interface NdekoContextType {
   importBackup: (backupJson: string) => Promise<{ imported: number }>;
   getProductLedger: (productId: string) => Promise<NdekoEvent[]>;
   getAllSales: () => Promise<NdekoEvent<SaleRecordedV1>[]>;
+  getAllEvents: () => Promise<NdekoEvent[]>;
 }
 
 const NdekoContext = createContext<NdekoContextType | null>(null);
@@ -116,9 +148,13 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [stockRunner] = useState(() => new ProjectionRunner(stockProjection));
   const [productsRunner] = useState(() => new ProjectionRunner(productsProjection));
+  const [customersRunner] = useState(() => new ProjectionRunner(customersProjection));
   const [stockState, setStockState] = useState<StockState>(() => stockProjection.init());
   const [productsState, setProductsState] = useState<ProductsState>(() =>
     productsProjection.init(),
+  );
+  const [customersState, setCustomersState] = useState<CustomersState>(() =>
+    customersProjection.init(),
   );
 
   const [pendingCount, setPendingCount] = useState(0);
@@ -150,13 +186,15 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const refreshProjections = useCallback(async () => {
     await stockRunner.catchUp(store);
     await productsRunner.catchUp(store);
+    await customersRunner.catchUp(store);
     setStockState(structuredClone(stockRunner.state));
     setProductsState(structuredClone(productsRunner.state));
+    setCustomersState(structuredClone(customersRunner.state));
     const pCount = await store.pendingCount();
     const tCount = await store.count();
     setPendingCount(pCount);
     setTotalEventCount(tCount);
-  }, [store, stockRunner, productsRunner]);
+  }, [store, stockRunner, productsRunner, customersRunner]);
 
   useEffect(() => {
     const unsub = syncClient.subscribe((s) => {
@@ -325,6 +363,28 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         await store.append(stockEvent);
       }
+
+      // Seed sample credit customer
+      const custEvent: NdekoEvent = {
+        id: uuidv7(),
+        orgId: currentCfg.orgId,
+        branchId: currentCfg.branchId,
+        deviceId: currentCfg.deviceId,
+        seq: seq++,
+        hlc: currentClock.tick(),
+        type: 'CUSTOMER_UPSERTED',
+        schemaV: 1,
+        payload: {
+          customerId: 'cust_mama_ngozi_01',
+          name: 'Mama Ngozi Provisions',
+          phone: '08031234567',
+          creditLimitKobo: 10000000,
+          archived: false,
+        },
+        createdAt: Date.now(),
+      };
+      await store.append(custEvent);
+
       saveConfig({ ...currentCfg, receiptCounter: seq });
     },
     [store],
@@ -381,6 +441,7 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     barcode?: string | null | undefined;
     priceKobo: number;
     costKobo?: number | undefined;
+    minStockQty?: number | undefined;
     unit?: ProductUpsertedV1['unit'] | undefined;
     archived?: boolean | undefined;
   }) => {
@@ -391,11 +452,54 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       barcode: fields.barcode ? fields.barcode.trim() : null,
       priceKobo: fields.priceKobo,
       costKobo: fields.costKobo,
+      minStockQty: fields.minStockQty,
       unit: fields.unit || 'each',
       archived: fields.archived || false,
     });
     return productId;
   };
+
+  const createOrUpdateCustomer = async (fields: {
+    customerId?: string | undefined;
+    name: string;
+    phone?: string | undefined;
+    creditLimitKobo?: number | undefined;
+    archived?: boolean | undefined;
+  }) => {
+    const customerId = fields.customerId || uuidv7();
+    await appendEvent('CUSTOMER_UPSERTED', {
+      customerId,
+      name: fields.name.trim(),
+      phone: fields.phone?.trim() || undefined,
+      creditLimitKobo: fields.creditLimitKobo ?? 0,
+      archived: fields.archived || false,
+    });
+    return customerId;
+  };
+
+  const recordPayment = async (
+    customerId: string,
+    amountKobo: number,
+    method: 'CASH' | 'TRANSFER' | 'CARD',
+    note?: string | undefined,
+  ) => {
+    const paymentId = uuidv7();
+    await appendEvent('PAYMENT_RECEIVED', {
+      paymentId,
+      customerId,
+      amountKobo,
+      method,
+      note: note?.trim() || undefined,
+    });
+    return paymentId;
+  };
+
+  const getCustomerStatement = useCallback(
+    (customerId: string): CustomerTransaction[] => {
+      return customerStatement(customersState, customerId);
+    },
+    [customersState],
+  );
 
   const receiveStock = async (
     productId: string,
@@ -510,6 +614,11 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return all.filter((e) => e.type === 'SALE_RECORDED').reverse() as NdekoEvent<SaleRecordedV1>[];
   };
 
+  const getAllEvents = async (): Promise<NdekoEvent[]> => {
+    const all = (await store.readSince(0, 1000000)).events;
+    return all;
+  };
+
   const unlockTill = (pin: string): boolean => {
     const storedPin = localStorage.getItem('ndeko_till_pin') || '1234';
     if (pin === storedPin) {
@@ -535,9 +644,33 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [productsState]);
 
+  const customers = useMemo(() => {
+    return Object.keys(customersState.customers)
+      .map((id) => customerView(customersState, id)!)
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [customersState]);
+
   const negativeStockAlerts = useMemo(() => {
     return negativeStock(stockState);
   }, [stockState]);
+
+  const lowStockAlerts = useMemo(() => {
+    const alerts: LowStockAlert[] = [];
+    for (const p of products) {
+      if (p.archived) continue;
+      const cur = stockLevel(stockState, config.branchId, p.productId);
+      const threshold = p.minStockQty ?? 5000; // default 5 units (5,000 milli)
+      if (cur <= threshold) {
+        alerts.push({
+          product: p,
+          currentStockMilli: cur,
+          thresholdMilli: threshold,
+        });
+      }
+    }
+    return alerts;
+  }, [products, stockState, config.branchId]);
 
   const value: NdekoContextType = {
     isReady,
@@ -545,8 +678,11 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     config,
     stockState,
     productsState,
+    customersState,
     products,
+    customers,
     negativeStockAlerts,
+    lowStockAlerts,
     pendingCount,
     totalEventCount,
     isOnline,
@@ -558,6 +694,9 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     lockTill,
     setTillPin,
     createOrUpdateProduct,
+    createOrUpdateCustomer,
+    recordPayment,
+    getCustomerStatement,
     receiveStock,
     adjustStock,
     recordSale,
@@ -567,6 +706,7 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     importBackup,
     getProductLedger,
     getAllSales,
+    getAllEvents,
   };
 
   return <NdekoContext.Provider value={value}>{children}</NdekoContext.Provider>;

@@ -28,7 +28,18 @@ export const productUpsertedV1 = z
     barcode: z.string().trim().min(1).max(64).nullable().optional(),
     priceKobo: kobo.optional(),
     costKobo: kobo.optional(),
+    minStockQty: kobo.optional(),
     unit: z.enum(UNITS).optional(),
+    archived: z.boolean().optional(),
+  })
+  .strict();
+
+export const customerUpsertedV1 = z
+  .object({
+    customerId: id,
+    name: z.string().trim().min(1).max(120).optional(),
+    phone: z.string().trim().max(30).optional(),
+    creditLimitKobo: kobo.optional(),
     archived: z.boolean().optional(),
   })
   .strict();
@@ -171,6 +182,7 @@ export const dayClosedV1 = z
   .strict();
 
 export type ProductUpsertedV1 = z.infer<typeof productUpsertedV1>;
+export type CustomerUpsertedV1 = z.infer<typeof customerUpsertedV1>;
 export type StockReceivedV1 = z.infer<typeof stockReceivedV1>;
 export type StockAdjustedV1 = z.infer<typeof stockAdjustedV1>;
 export type SaleRecordedV1 = z.infer<typeof saleRecordedV1>;

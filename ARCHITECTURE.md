@@ -217,3 +217,4 @@ Run it across thousands of seeds in CI. Any failing seed is committed as a regre
 | 2026-10-20 | `EventStore` is a pure log; no `project()` method  | Projections are folds in `@ndeko/core`; keeps adapters thin                       |
 | 2026-10-20 | Concrete projections live in `@ndeko/projections`  | They need payload types from schemas, which depend on core                        |
 | 2026-10-20 | Reconciliation flags are derived from state        | Stored flags would be order-dependent; derived ones self-clear                    |
+| 2026-10-20 | Add `CUSTOMER_UPSERTED` event                      | Enables offline-first customer profiles & credit limits via pure LWW projections  |

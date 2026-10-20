@@ -80,14 +80,14 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 
 ## Phase 3: Retail depth (weeks 5-6)
 
-- [ ] Customers: profile, credit limit, running balance
-- [ ] `PAYMENT_RECEIVED` and customer statement
-- [ ] Reconciliation inbox for negative stock and flagged events
-- [ ] End-of-day cash-up (`DAY_CLOSED`: expected vs counted cash)
-- [ ] Low-stock thresholds and alerts
-- [ ] Suppliers and purchase orders
-- [ ] Reports: sales by day/product/cashier, margin, stock valuation, aged credit
-- [ ] CSV export for every report
+- [x] Customers: profile, credit limit, running balance
+- [x] `PAYMENT_RECEIVED` and customer statement
+- [x] Reconciliation inbox for negative stock and flagged events
+- [x] End-of-day cash-up (`DAY_CLOSED`: expected vs counted cash)
+- [x] Low-stock thresholds and alerts
+- [x] Suppliers and purchase orders (supplier receiving and tracking)
+- [x] Reports: sales by day/product/cashier, margin, stock valuation, aged credit
+- [x] CSV export for every report
 
 **Done when:** a shop owner can run a full trading day, close it, and trust the report totals against a manual count.
 
