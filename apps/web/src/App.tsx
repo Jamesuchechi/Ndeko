@@ -9,7 +9,17 @@ import { PinLockScreen } from './components/PinLockScreen';
 type Tab = 'pos' | 'inventory' | 'sales' | 'settings';
 
 export const App: React.FC = () => {
-  const { isReady, isLocked, config, pendingCount, isOnline, lockTill } = useNdeko();
+  const {
+    isReady,
+    isLocked,
+    config,
+    pendingCount,
+    isOnline,
+    lockTill,
+    syncState,
+    syncNow,
+    dismissDriftWarning,
+  } = useNdeko();
   const [activeTab, setActiveTab] = useState<Tab>('pos');
 
   if (!isReady) {
@@ -73,14 +83,38 @@ export const App: React.FC = () => {
 
         {/* Status Indicators and Lock */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span
-            className={`badge ${
-              pendingCount > 0 ? 'badge-amber' : isOnline ? 'badge-emerald' : 'badge-cyan'
-            }`}
-            title="Local event log sync status"
+          <button
+            onClick={() => syncNow()}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+            title="Click to trigger cloud sync now"
           >
-            {pendingCount > 0 ? `${pendingCount} pending` : isOnline ? 'Online' : 'Offline Ready'}
-          </span>
+            <span
+              className={`badge ${
+                syncState.status === 'syncing'
+                  ? 'badge-cyan'
+                  : syncState.status === 'error'
+                    ? 'badge-rose'
+                    : pendingCount > 0
+                      ? 'badge-amber'
+                      : 'badge-emerald'
+              }`}
+            >
+              {syncState.status === 'syncing'
+                ? '🔄 Syncing...'
+                : syncState.status === 'error'
+                  ? '⚠️ Sync Error'
+                  : !isOnline
+                    ? `⚡ Offline (${pendingCount})`
+                    : pendingCount > 0
+                      ? `⏳ ${pendingCount} pending`
+                      : '✓ Synced'}
+            </span>
+          </button>
 
           <button
             onClick={lockTill}
@@ -92,6 +126,45 @@ export const App: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {/* Clock Drift Warning Banner */}
+      {syncState.driftWarning && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.15)',
+            borderBottom: '1px solid rgba(245, 158, 11, 0.4)',
+            color: '#fbbf24',
+            padding: '8px 20px',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>⚠️</span>
+            <span>
+              <strong>Clock Drift Warning:</strong> Remote events detected from a device with its
+              clock set far into the future. Local event causality is protected by HLC drift
+              clamping, but please verify till system time.
+            </span>
+          </div>
+          <button
+            onClick={dismissDriftWarning}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              color: '#fbbf24',
+              borderRadius: 4,
+              padding: '2px 8px',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main View Container */}
       <main style={{ flex: 1, overflowY: 'auto' }}>

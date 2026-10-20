@@ -55,25 +55,25 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 
 **Server**
 
-- [ ] Postgres schema: `events`, `devices`, `branches`, `orgs`, `memberships`
-- [ ] `POST /sync/push` with per-event results, `ON CONFLICT (id) DO NOTHING`
-- [ ] `GET /sync/pull?since=&limit=` using `server_seq`
-- [ ] Device registration and token auth
-- [ ] Org scoping + RLS isolation test (org A cannot read org B)
+- [x] Postgres schema: `events`, `devices`, `branches`, `orgs`, `memberships`
+- [x] `POST /sync/push` with per-event results, `ON CONFLICT (id) DO NOTHING`
+- [x] `GET /sync/pull?since=&limit=` using `server_seq`
+- [x] Device registration and token auth
+- [x] Org scoping + RLS isolation test (org A cannot read org B)
 
 **Client**
 
-- [ ] Sync client: batching, exponential backoff with jitter, resumable cursor
-- [ ] Pending count and sync status indicator in the UI
-- [ ] Apply remote events through the same projection path as local ones
-- [ ] Held-void handling (void arrives before its sale)
-- [ ] Clock-drift warning in the UI
+- [x] Sync client: batching, exponential backoff with jitter, resumable cursor
+- [x] Pending count and sync status indicator in the UI
+- [x] Apply remote events through the same projection path as local ones
+- [x] Held-void handling (void arrives before its sale)
+- [x] Clock-drift warning in the UI
 
 **Verification**
 
 - [x] `packages/sim`: N devices, seeded RNG, random offline periods, reordering and duplication
 - [x] Convergence assertion: identical projections on all devices
-- [ ] Run 1,000+ seeds in CI; commit failing seeds as fixtures
+- [x] Run 1,000+ seeds in CI; commit failing seeds as fixtures
 - [x] Two-tills-last-unit scenario raises a reconciliation flag
 
 **Done when:** the simulator passes thousands of seeds and two real phones converge after one has been offline for a day.

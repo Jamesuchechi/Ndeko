@@ -11,12 +11,18 @@ export const SettingsView: React.FC = () => {
     setTillPin,
     exportBackup,
     importBackup,
+    syncState,
+    syncNow,
+    registerDeviceOnServer,
   } = useNdeko();
 
   const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl || 'http://localhost:8787');
+  const [pairingStatus, setPairingStatus] = useState<string | null>(null);
+  const [isPairing, setIsPairing] = useState(false);
 
   useEffect(() => {
     if ('storage' in navigator && 'persisted' in navigator.storage) {
@@ -113,17 +119,33 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Sync & Offline Status */}
+        {/* Sync & Cloud Replication */}
         <div style={cardStyle} className="glass-panel">
           <div style={cardHeaderStyle}>
             <span style={{ fontSize: '1.2rem' }}>⚡</span>
-            <h3 style={cardTitleStyle}>Sync & Platform Telemetry</h3>
+            <h3 style={cardTitleStyle}>Sync & Cloud Replication</h3>
           </div>
           <div style={infoListStyle}>
             <div style={infoRowStyle}>
-              <span style={labelStyle}>Network Connectivity</span>
-              <span className={`badge ${isOnline ? 'badge-emerald' : 'badge-amber'}`}>
-                {isOnline ? '● Online' : '○ Offline Ready'}
+              <span style={labelStyle}>Replication Status</span>
+              <span
+                className={`badge ${
+                  syncState.status === 'syncing'
+                    ? 'badge-cyan'
+                    : syncState.status === 'error'
+                      ? 'badge-rose'
+                      : pendingCount > 0
+                        ? 'badge-amber'
+                        : 'badge-emerald'
+                }`}
+              >
+                {syncState.status === 'syncing'
+                  ? '🔄 Syncing...'
+                  : syncState.status === 'error'
+                    ? '⚠️ Error'
+                    : !isOnline
+                      ? '⚡ Offline'
+                      : '✓ Synced'}
               </span>
             </div>
             <div style={infoRowStyle}>
@@ -133,11 +155,23 @@ export const SettingsView: React.FC = () => {
               </span>
             </div>
             <div style={infoRowStyle}>
+              <span style={labelStyle}>Pull Sequence Cursor</span>
+              <span style={{ ...valueStyle, color: '#38bdf8' }}>
+                server_seq #{syncState.cursor}
+              </span>
+            </div>
+            <div style={infoRowStyle}>
               <span style={labelStyle}>Total Stored Events</span>
               <span style={valueStyle}>{totalEventCount} events</span>
             </div>
             <div style={infoRowStyle}>
-              <span style={labelStyle}>Persistent Storage (OPFS/IDB)</span>
+              <span style={labelStyle}>Device Pairing Status</span>
+              <span className={`badge ${config.deviceToken ? 'badge-emerald' : 'badge-amber'}`}>
+                {config.deviceToken ? 'Paired & Token Active' : 'Unregistered'}
+              </span>
+            </div>
+            <div style={infoRowStyle}>
+              <span style={labelStyle}>Persistent Storage</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className={`badge ${isPersisted ? 'badge-emerald' : 'badge-amber'}`}>
                   {isPersisted ? 'Protected' : 'Standard'}
@@ -148,11 +182,79 @@ export const SettingsView: React.FC = () => {
                     className="btn-secondary"
                     style={smallBtnStyle}
                   >
-                    Protect Storage
+                    Protect
                   </button>
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Sync Server Pairing Form */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              Sync Server URL
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <input
+                type="text"
+                value={serverUrlInput}
+                onChange={(e) => setServerUrlInput(e.target.value)}
+                placeholder="http://localhost:8787"
+                style={{
+                  flex: 1,
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: '0.85rem',
+                }}
+              />
+              <button
+                disabled={isPairing}
+                onClick={async () => {
+                  setIsPairing(true);
+                  setPairingStatus(null);
+                  try {
+                    await registerDeviceOnServer(serverUrlInput.trim());
+                    setPairingStatus('Successfully registered device and paired with sync server!');
+                  } catch (err: unknown) {
+                    setPairingStatus(
+                      `Pairing failed: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                  } finally {
+                    setIsPairing(false);
+                  }
+                }}
+                className="btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+              >
+                {isPairing ? 'Pairing...' : 'Register / Pair'}
+              </button>
+              <button
+                onClick={() => syncNow()}
+                className="glow-btn"
+                style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+              >
+                Sync Now
+              </button>
+            </div>
+            {pairingStatus && (
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  marginTop: 6,
+                  color: pairingStatus.includes('failed') ? '#f43f5e' : '#34d399',
+                }}
+              >
+                {pairingStatus}
+              </p>
+            )}
+            {syncState.lastError && (
+              <p style={{ fontSize: '0.75rem', marginTop: 4, color: '#f43f5e' }}>
+                Sync Error: {syncState.lastError}
+              </p>
+            )}
           </div>
         </div>
 

@@ -12,6 +12,7 @@ import {
   type NegativeStock,
 } from '@ndeko/projections';
 import { LATEST_SCHEMA_V, type ProductUpsertedV1, type SaleRecordedV1 } from '@ndeko/schemas';
+import { SyncClient, type SyncState } from '../sync/client';
 
 export interface DeviceConfig {
   orgId: string;
@@ -20,6 +21,8 @@ export interface DeviceConfig {
   deviceId: string;
   deviceCode: string;
   receiptCounter: number;
+  serverUrl?: string;
+  deviceToken?: string;
 }
 
 const DEFAULT_CONFIG: DeviceConfig = {
@@ -29,6 +32,8 @@ const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: 'dev_' + Math.random().toString(36).slice(2, 8),
   deviceCode: 'D1',
   receiptCounter: 0,
+  serverUrl: 'http://localhost:8787',
+  deviceToken: '',
 };
 
 export interface CartLine {
@@ -49,6 +54,10 @@ export interface NdekoContextType {
   pendingCount: number;
   totalEventCount: number;
   isOnline: boolean;
+  syncState: SyncState;
+  syncNow: () => Promise<void>;
+  registerDeviceOnServer: (serverUrl: string) => Promise<void>;
+  dismissDriftWarning: () => void;
   unlockTill: (pin: string) => boolean;
   lockTill: () => void;
   setTillPin: (newPin: string) => void;
@@ -125,6 +134,18 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('ndeko_device_config', JSON.stringify(newCfg));
   };
 
+  const [syncClient] = useState(() => {
+    return new SyncClient(
+      {
+        serverUrl: config.serverUrl || 'http://localhost:8787',
+        deviceToken: config.deviceToken || '',
+      },
+      store,
+      clock,
+    );
+  });
+  const [syncState, setSyncState] = useState<SyncState>(syncClient.state);
+
   // Re-run catchUp to update state
   const refreshProjections = useCallback(async () => {
     await stockRunner.catchUp(store);
@@ -136,6 +157,66 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPendingCount(pCount);
     setTotalEventCount(tCount);
   }, [store, stockRunner, productsRunner]);
+
+  useEffect(() => {
+    const unsub = syncClient.subscribe((s) => {
+      setSyncState({ ...s });
+      setPendingCount(s.pendingCount);
+    });
+    syncClient.start();
+    return () => {
+      unsub();
+      syncClient.stop();
+    };
+  }, [syncClient]);
+
+  useEffect(() => {
+    const unsub = syncClient.onRemoteEvents(async () => {
+      await refreshProjections();
+    });
+    return unsub;
+  }, [syncClient, refreshProjections]);
+
+  const syncNow = useCallback(async () => {
+    await syncClient.syncNow();
+  }, [syncClient]);
+
+  const dismissDriftWarning = useCallback(() => {
+    syncClient.state.driftWarning = false;
+    setSyncState({ ...syncClient.state });
+  }, [syncClient]);
+
+  const registerDeviceOnServer = useCallback(
+    async (serverUrl: string) => {
+      const res = await fetch(`${serverUrl}/devices/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: config.orgId,
+          branchCode: config.branchCode,
+          deviceCode: config.deviceCode,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Device registration failed: ${err}`);
+      }
+      const data = await res.json();
+      const updatedCfg: DeviceConfig = {
+        ...config,
+        serverUrl,
+        deviceToken: data.deviceToken,
+        deviceId: data.deviceId,
+      };
+      saveConfig(updatedCfg);
+      syncClient.updateConfig({
+        serverUrl,
+        deviceToken: data.deviceToken,
+      });
+      await syncClient.syncNow();
+    },
+    [config, syncClient],
+  );
 
   // Seed sample products if database is fresh
   const seedInitialDataIfNeeded = useCallback(
@@ -290,6 +371,7 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await store.append(event);
     saveConfig({ ...config, receiptCounter: nextSeq });
     await refreshProjections();
+    syncClient.syncNow().catch(() => {});
     return event;
   };
 
@@ -468,6 +550,10 @@ export const NdekoProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     pendingCount,
     totalEventCount,
     isOnline,
+    syncState,
+    syncNow,
+    registerDeviceOnServer,
+    dismissDriftWarning,
     unlockTill,
     lockTill,
     setTillPin,
