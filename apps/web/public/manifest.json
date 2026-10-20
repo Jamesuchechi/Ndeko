@@ -1,0 +1,17 @@
+{
+  "name": "Ndekọ Shop OS",
+  "short_name": "Ndekọ",
+  "description": "Offline-first shop OS for small retailers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

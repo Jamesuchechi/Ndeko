@@ -12,6 +12,10 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@ndeko/core": "workspace:^"
+    "@ndeko/core": "workspace:^",
+    "dexie": "^4"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6"
   }
 }

@@ -53,15 +53,19 @@ describe('convergence simulator', () => {
     expect(voids).toBeGreaterThan(0);
   });
 
-  it(`N devices with random offline periods converge across ${SEEDS} seeds`, async () => {
-    const bad: string[] = [];
-    for (let seed = 1; seed <= SEEDS; seed++) {
-      const r = await runSimulation(seed);
-      if (!r.ok) bad.push(`seed ${seed}: ${r.failures.slice(0, 3).join(' | ')}`);
-    }
-    // A failing seed must be committed as a regression fixture (see SEED_FIXTURES below).
-    expect(bad).toEqual([]);
-  }, 60_000 + SEEDS * 1_000);
+  it(
+    `N devices with random offline periods converge across ${SEEDS} seeds`,
+    async () => {
+      const bad: string[] = [];
+      for (let seed = 1; seed <= SEEDS; seed++) {
+        const r = await runSimulation(seed);
+        if (!r.ok) bad.push(`seed ${seed}: ${r.failures.slice(0, 3).join(' | ')}`);
+      }
+      // A failing seed must be committed as a regression fixture (see SEED_FIXTURES below).
+      expect(bad).toEqual([]);
+    },
+    60_000 + SEEDS * 1_000,
+  );
 
   it('longer runs with more devices still converge', async () => {
     for (const seed of [101, 102, 103]) {

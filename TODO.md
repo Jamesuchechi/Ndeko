@@ -22,32 +22,32 @@ Legend: `[ ]` todo, `[x]` done. Each phase ends with a **Definition of done**; d
 - [x] UUIDv7 generation
 - [x] HLC implementation with unit tests (local tick, remote merge, drift guard)
 - [x] `EventStore` interface + `memory` adapter + shared contract tests
-- [ ] `dexie` adapter passing the shared `EventStore` contract tests
+- [x] `dexie` adapter passing the shared `EventStore` contract tests
 - [x] Projection engine (pure fold) with snapshots; stock and products projections
 - [x] Money (integer kobo) and quantity (milli-unit) helpers, single rounding rule
 
 **Products and stock**
 
-- [ ] `PRODUCT_UPSERTED` + products screen (add, edit, archive)
-- [ ] Barcode field + lookup
-- [ ] `STOCK_RECEIVED` and `STOCK_ADJUSTED` (reason required)
-- [ ] Stock levels projection and stock ledger view per product
+- [x] `PRODUCT_UPSERTED` + products screen (add, edit, archive)
+- [x] Barcode field + lookup
+- [x] `STOCK_RECEIVED` and `STOCK_ADJUSTED` (reason required)
+- [x] Stock levels projection and stock ledger view per product
 
 **Selling**
 
-- [ ] POS screen: search, barcode scan (`BarcodeDetector` with ZXing fallback), cart
-- [ ] Cash sale and credit sale (customer required for credit)
-- [ ] `SALE_RECORDED` and `SALE_VOIDED`
-- [ ] Offline-safe receipt numbers (`branch-device-counter`)
-- [ ] Receipt view and browser print
-- [ ] Daily sales summary
+- [x] POS screen: search, barcode scan (`BarcodeDetector` with ZXing fallback), cart
+- [x] Cash sale and credit sale (customer required for credit)
+- [x] `SALE_RECORDED` and `SALE_VOIDED`
+- [x] Offline-safe receipt numbers (`branch-device-counter`)
+- [x] Receipt view and browser print
+- [x] Daily sales summary
 
 **Platform**
 
-- [ ] PWA manifest + service worker, installable, fully usable offline
-- [ ] `navigator.storage.persist()` request
-- [ ] Encrypted JSON backup export and import
-- [ ] Till PIN lock
+- [x] PWA manifest + service worker, installable, fully usable offline
+- [x] `navigator.storage.persist()` request
+- [x] Encrypted JSON backup export and import
+- [x] Till PIN lock
 
 **Done when:** with network disabled, a cashier can receive stock, sell, void, print a receipt and see correct stock, and a backup restores identical state.
 
